@@ -5,12 +5,19 @@ Created on Thu Mar 24 19:35:01 2022
 Collects GPS Lat/Long coordinates from jpeg photos in a file
 Prepares a dataframe and saves it in decimal degrees
 
+kml ref:
+https://simplekml.readthedocs.io/en/latest/geometries.html#simplekml.LineString
+
 @author: Brian
 """
 import glob
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 import pandas as pd
+import simplekml
+import numpy as np
+import pprint
+
 
 def get_exif(filename):
     
@@ -47,6 +54,8 @@ def get_coords(raw_list):
     
     return round((degs + mins/60 + secs/3600), 6)
 
+#%%
+
 # collect all jpeg files in a fodler    
 img_files = glob.glob('*.jpg')   
 
@@ -54,8 +63,11 @@ img_files = glob.glob('*.jpg')
 count = 1
 lat_list = []
 long_list = []
+lat_long_list = []
+altitude_list = []
 count_list = []
 
+#%%
 for image_path in img_files:
 
     exif = get_exif(image_path)
@@ -82,15 +94,31 @@ for image_path in img_files:
     else:
         pass
     
+    # get altitude
+    altitude = exif['GPSInfo'][6]
+    altitude_list.append(altitude)
+    
     # update lists
     lat_list.append(lat)
     long_list.append(long)
-    count_list.append(count)
+    lat_long_list.append((long, lat))
+    count_list.append(str(count))
     
     count += 1
 
 ## put into a dataframe in Excel-KML format (https://www.earthpoint.us/ExcelToKml.aspx)
-df_coords = pd.DataFrame({'Latitude':lat_list, 'Longitude':long_list, 'Name':count_list})
+df_coords = pd.DataFrame({'latitude':lat_list, 
+                          'longitude':long_list, 
+                          'name':count_list})
 
 # save to excel
-df_coords.to_excel('Flightpath.xlsx')
+df_coords.to_excel('flightpath.xlsx')
+
+#%%
+# save as kml
+kml = simplekml.Kml()
+ls = kml.newlinestring(name='Drone flight path')
+ls.coords = lat_long_list
+ls.extrude = 1
+ls.altitudemode = simplekml.AltitudeMode.relativetoground
+kml.save('flightpath.kml')
